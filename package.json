@@ -1,0 +1,23 @@
+{
+  "name": "curved-arbs",
+  "version": "1.0.0",
+  "description": "A package dedicated to finding arbitrage between AMM markets, including those that don't use Uniswap straight line, but more complex variations of it.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "test-formulas": "node snippets/testFormulas"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://gitlab.com/blocklytics/curved-arbs.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://gitlab.com/blocklytics/curved-arbs/issues"
+  },
+  "homepage": "https://gitlab.com/blocklytics/curved-arbs#readme",
+  "dependencies": {
+    "gss": "^0.1.2"
+  }
+}
