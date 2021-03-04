@@ -18,6 +18,11 @@
   },
   "homepage": "https://gitlab.com/blocklytics/curved-arbs#readme",
   "dependencies": {
-    "gss": "^0.1.2"
+    "dotenv": "^8.2.0",
+    "ethers": "^5.0.31",
+    "fs": "^0.0.1-security",
+    "ganache-cli": "^6.12.2",
+    "gss": "^0.1.2",
+    "path": "^0.12.7"
   }
 }
