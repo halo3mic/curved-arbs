@@ -58,9 +58,17 @@ async function findBaseShortage(forkBlock, delta) {
     await findBaseShortage(forkBlock+delta)
 }
 
+function calcQuad(a, b, c) {
+    let nominator = Math.sqrt(b**2-4*a*c)-b;
+    let denominator = 2*a;
+    return nominator/denominator;
+}
+
+
 module.exports = {
     convertObjectWithBigNumberToNumber,
     queryDodoPoolInfo,
     findBaseShortage,
     getForkProvider, 
+    calcQuad
 }

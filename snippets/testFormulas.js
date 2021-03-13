@@ -44,7 +44,9 @@ async function compare({
     console.log('Past equilibrium: ', baseOffset<baseAmount)
     console.log('Quote amount from call:', ethers.utils.formatUnits(quotesCall, decimals[0]))
     console.log('Quote amount from calculation:', quotesCalc)
+    console.log('Quote amount difference:', (ethers.utils.formatUnits(quotesCall, decimals[0])-quotesCalc)*100/quotesCalc);
     console.log('Base amount from calculation:', baseCalc)
+    console.log('Base amount difference:', (baseAmount-baseCalc)*100/baseCalc);
 } 
 
 
@@ -81,7 +83,7 @@ async function testQuoteShortageSellBaseAboveEquilibrium() {
         decimals: [ 6, 18 ], 
         forkBlock: 11907345, 
         methodCall: 'querySellBaseToken', 
-        methodCalc: 'baseShortageSellBase',
+        methodCalc: 'quoteShortageSellBase',
         methodCalcInverse: 'baseShortageBuyQuote', 
         strategy: 'quote-shortage | sell-base | above-equilibrium',
     }
@@ -119,7 +121,7 @@ async function testQuoteShortageBuyBaseAboveEquilibrium() {
         decimals: [ 6, 18 ], 
         forkBlock: 11907345, 
         methodCall: 'queryBuyBaseToken', 
-        methodCalc: 'baseShortageBuyBase',
+        methodCalc: 'quoteShortageBuyBase',
         methodCalcInverse: 'baseShortageSellQuote', 
         strategy: 'quote-shortage | buy-base | above-equilibrium',
     }
@@ -160,7 +162,7 @@ async function testBaseShortageSellBaseAboveEquilibrium() {
         decimals: [ 6, 18 ], 
         forkBlock: 11907386, 
         methodCall: 'querySellBaseToken', 
-        methodCalc: 'quoteShortageSellBase',
+        methodCalc: 'baseShortageSellBase',
         methodCalcInverse: 'quoteShortageBuyQuote', 
         strategy: 'base-shortage | sell-base | above-equilibrium',
     }
@@ -198,7 +200,7 @@ async function testBaseShortageBuyBaseAboveEquilibrium() {
         decimals: [ 6, 18 ], 
         forkBlock: 11907386, 
         methodCall: 'queryBuyBaseToken', 
-        methodCalc: 'quoteShortageBuyBase',
+        methodCalc: 'baseShortageBuyBase',
         methodCalcInverse: 'quoteShortageSellQuote', 
         strategy: 'base-shortage | buy-base | above-equilibrium'
     }
@@ -207,7 +209,7 @@ async function testBaseShortageBuyBaseAboveEquilibrium() {
 
 async function main() {
     const methods = [
-        {
+        { // THESE TWO FUNCTIONS ARE THE SAME SINCE IN A QUOTE SHORTAGE SITUATION, SELLING BASE DOES NOT CHANGE THE STATE OF THE POOL
             method: testQuoteShortageSellBaseBelowEquilibrium,
             tags: [    
                 'quote-short', 
