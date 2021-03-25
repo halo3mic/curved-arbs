@@ -268,7 +268,7 @@ class DodoV1 {
 function getExchanges(provider) {
     return {
         uniswap: new Uniswap(provider), 
-        dodov1: new DodoV1(provider)
+        dodo: new DodoV1(provider)
     }   
 }
 

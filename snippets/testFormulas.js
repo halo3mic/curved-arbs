@@ -123,7 +123,7 @@ async function testQuoteShortageBuyBaseAboveEquilibrium() {
         decimals: [ 6, 18 ], 
         forkBlock: 11907345, 
         methodCall: 'queryBuyBaseToken', 
-        methodCalc: 'quoteShortageBuyBase',
+        methodCalc: 'baseShortageBuyBase',
         methodCalcInverse: 'quoteShortageSellQuote', 
         strategy: 'quote-shortage | buy-base | above-equilibrium',
     }
