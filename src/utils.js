@@ -1,6 +1,15 @@
 const providers = require('./providers')
 const ethers = require('ethers')
+const gss = require('gss')
 
+
+async function approveERC20ForDispatcher(provider, signer, spender, tokens) {
+    let dispatcher = '0xD30Ce37a6F2424593DaBe9b712d235781815445D'
+    let dispatcherContract = new ethers.Contract(dispatcher, config.ABIS['dispatcher'], signer)
+    let tx = await dispatcherContract.populateTransaction.tokenAllowAll(tokens, spender)
+    let response = await signer.sendTransaction(tx)
+    return provider.waitForTransaction(response.hash)    
+}
 
 function convertObjectWithBigNumberToNumber(obj, decMap) {
     let newObj = {...obj}
@@ -13,10 +22,11 @@ function convertObjectWithBigNumberToNumber(obj, decMap) {
     return newObj
 }
 
-function getForkProvider(blockNumber) {
+function getForkProvider(blockNumber, params) {
     let ganacheParams = {
         fork: `${providers.ws.endpoint}@${blockNumber}`
     }
+    ganacheParams = params ? {...params, ...ganacheParams} : ganacheParams
     return providers.setGancheProvider(ganacheParams)
 }
 
@@ -58,8 +68,25 @@ async function findBaseShortage(forkBlock, delta) {
     await findBaseShortage(forkBlock+delta)
 }
 
+function getGssForTradeFunction(tradeFunction, upBound, precision) {
+    upBound = upBound || 1e3
+    precision = precision || 1e-3
+    if (tradeFunction(precision)<0) {
+        return 0
+    }
+    let gssOptimalAmount = gss.gssSync(
+        x=>-tradeFunction(x),  // Function
+        0, // Lower bound
+        upBound/2, // Mid number
+        upBound, // Upper bound
+        precision, // Precision
+    )
+    return gssOptimalAmount
+}
+
 module.exports = {
     convertObjectWithBigNumberToNumber,
+    getGssForTradeFunction,
     queryDodoPoolInfo,
     findBaseShortage,
     getForkProvider, 

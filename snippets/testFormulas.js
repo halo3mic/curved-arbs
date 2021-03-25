@@ -24,7 +24,7 @@ async function compare({
         decimals, 
     )
     let baseOffset = Math.abs(poolInfo.B0-poolInfo.B)
-    let baseAmount = aboveEq ? baseOffset*1.5 : baseOffset*0.25
+    let baseAmount = aboveEq ? baseOffset*10 : baseOffset*0.1
     let baseAmountBN = ethers.utils.parseUnits(baseAmount.toString(), decimals[1])
     let isBaseShortage = poolInfo.B < poolInfo.B0
     let isEquilibrium = poolInfo.B == poolInfo.B0
@@ -34,6 +34,9 @@ async function compare({
     let quotesCall = await dodoContract[methodCall](poolAddress, baseAmountBN)
     let quotesCalc = formulas.dodo[methodCalc](baseAmount, poolInfo)
     let baseCalc = formulas.dodo[methodCalcInverse](-quotesCalc, poolInfo)
+    let quoteCallFormatted = parseFloat(ethers.utils.formatUnits(quotesCall, decimals[0]))
+    let diff = Math.abs(quoteCallFormatted - quotesCalc)
+    let diffPrct = (100*diff/quoteCallFormatted).toFixed(2) + '%'
     
     // Log it to console
     console.log('^'.repeat(50))
@@ -42,8 +45,9 @@ async function compare({
     console.log('Pool info:\n', poolInfo)
     console.log('Base amount: ', baseAmount)
     console.log('Past equilibrium: ', baseOffset<baseAmount)
-    console.log('Quote amount from call:', ethers.utils.formatUnits(quotesCall, decimals[0]))
+    console.log('Quote amount from call:', quoteCallFormatted)
     console.log('Quote amount from calculation:', quotesCalc)
+    console.log('Prct deviation: ', diffPrct)
     console.log('Base amount from calculation:', baseCalc)
 } 
 
@@ -81,8 +85,8 @@ async function testQuoteShortageSellBaseAboveEquilibrium() {
         decimals: [ 6, 18 ], 
         forkBlock: 11907345, 
         methodCall: 'querySellBaseToken', 
-        methodCalc: 'baseShortageSellBase',
-        methodCalcInverse: 'baseShortageBuyQuote', 
+        methodCalc: 'quoteShortageSellBase',
+        methodCalcInverse: 'quoteShortageBuyQuote', 
         strategy: 'quote-shortage | sell-base | above-equilibrium',
     }
     compare(settings)
@@ -119,8 +123,8 @@ async function testQuoteShortageBuyBaseAboveEquilibrium() {
         decimals: [ 6, 18 ], 
         forkBlock: 11907345, 
         methodCall: 'queryBuyBaseToken', 
-        methodCalc: 'baseShortageBuyBase',
-        methodCalcInverse: 'baseShortageSellQuote', 
+        methodCalc: 'quoteShortageBuyBase',
+        methodCalcInverse: 'quoteShortageSellQuote', 
         strategy: 'quote-shortage | buy-base | above-equilibrium',
     }
     compare(settings)

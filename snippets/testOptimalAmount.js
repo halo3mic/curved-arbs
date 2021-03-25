@@ -6,7 +6,7 @@ function getGssForTradeFunction(tradeFunction, absBound) {
     let lowBound = -absBound
     let upBound = absBound
     let gssOptimalAmount = gss(
-        x=>-tradeFunction(x),  // Function
+        x=>-tradeFunction(x),  // Function (negative to find max instead of min)
         lowBound, // Lower bound
         (upBound+lowBound)/2, // Mid number
         upBound, // Upper bound
