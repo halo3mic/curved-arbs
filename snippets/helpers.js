@@ -1,17 +1,4 @@
-async function getErc20Balance(provider, token, holder, convert) {
-    let balance = await provider.call({
-        data: '0x70a08231000000000000000000000000' + holder.replace('0x', ''),
-        to: token
-    }).then(b => {
-        // console.log(b)
-        return ethers.BigNumber.from(b)}
-    )
-    if (convert) {
-        dec = await getErc20Decimals(provider, token)
-        balance = parseFloat(ethers.utils.formatUnits(balance, dec))
-    }
-    return balance
-}
+
 
 async function approveErc20(signer, token, spender, amount) {
     const amountHex = amount ? amount.toString(16).replace('0x', '') : 'f'.repeat(64)

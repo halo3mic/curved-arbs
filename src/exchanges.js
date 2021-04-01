@@ -1,18 +1,36 @@
-const { ABIS, ROUTERS, ETH_ADDRESS, WETH_ADDRESS } = require('./config')
+const config = require('./config')
 const ethers = require('ethers')
 const instrMng = require('./instrMng')
 const utils = require('./utils')
 const formulas = require('./formulas')
 
 
+class Dex {
+
+    getPoolData() {
+
+    }
+    getAmountOut() {
+
+    }
+    makeTrade() {
+
+    }
+    makeQuery() {
+
+    }
+}
+
+
 class Uniswap {
 
     constructor(provider) {
         this.provider = provider
-        this.routerAddress = ROUTERS.UNISWAP
+        this.routerAddress = config.ROUTERS.UNISWAP
+        this.approver = config.APPROVERS.UNISWAP
         this.routerContract = new ethers.Contract(
             this.routerAddress, 
-            ABIS['uniswapRouter'], 
+            config.ABIS['uniswapRouter'], 
             this.provider
         )
     }
@@ -48,9 +66,12 @@ class Uniswap {
     }
 
     async fetchReservesRaw(poolAddress) {
+        if (!this.provider) {
+            throw new Error('This method call requires a web3 provider.')
+        }
         const poolContract = new ethers.Contract(
             poolAddress, 
-            ABIS['uniswapPool'], 
+            config.ABIS['uniswapPool'], 
             this.provider
         )
         return await poolContract.getReserves()
@@ -58,10 +79,16 @@ class Uniswap {
 
 
     async queryAmountOut(amountIn, path) {
+        if (!this.provider) {
+            throw new Error('This method call requires a web3 provider.')
+        }
         return this.routerContract.getAmountsOut(amountIn, path).then(r => r[1])
     }
 
     async getPoolData(poolId, convert) {
+        if (!this.provider) {
+            throw new Error('This method call requires a web3 provider.')
+        }
         let pool = instrMng.poolIdMap[poolId]
         let reserves = await this.fetchReservesRaw(pool.address)
         if (convert) {
@@ -81,35 +108,138 @@ class Uniswap {
     }
 
     async makeTrade(args, wethEnabled, deadlineOffset) {
+        // if (!this.provider) {
+        //     throw new Error('This method call requires a web3 provider.')
+        // }
         deadlineOffset = deadlineOffset || 300
-        // outputAmount being 0 can be very dangerous if tx sent by itself
+        let amountOut = ethers.utils.parseUnits('1', 'wei')
+        // outputAmount being 0 can be very dangerous if tx sent by itself!!!
         let tradeTimeout = Math.round((Date.now()/1000) + deadlineOffset)
-        if (args.tknPath[0]==WETH_ADDRESS && !wethEnabled) {
-            var tradeTx = await this.routerContract.populateTransaction.swapExactETHForTokens(
-                args.amountOut, 
+        if (args.tknPath[0]==config.WETH_ADDRESS && !wethEnabled) {
+            var tx = await this.routerContract.populateTransaction.swapExactETHForTokens(
+                amountOut, 
                 args.tknPath, 
                 args.to, 
                 tradeTimeout
             )
-            tradeTx.value = args.amountIn
-        } else if (args.tknPath[args.tknPath.length-1]==WETH_ADDRESS && !wethEnabled) {
-            var tradeTx = await this.routerContract.populateTransaction.swapExactTokensForETH(
+            tx.value = args.amountIn
+        } else if (args.tknPath[args.tknPath.length-1]==config.WETH_ADDRESS && !wethEnabled) {
+            var tx = await this.routerContract.populateTransaction.swapExactTokensForETH(
                 args.amountIn,
-                args.amountOut, 
+                amountOut, 
                 args.tknPath, 
                 args.to, 
                 tradeTimeout
             )
         } else {
-            var tradeTx = await this.routerContract.populateTransaction.swapExactTokensForETH(
+            var tx = await this.routerContract.populateTransaction.swapExactTokensForETH(
                 args.amountIn,
-                args.amountOut, 
+                amountOut, 
                 args.tknPath, 
                 args.to, 
                 tradeTimeout
             )
         }
-        return tradeTx   
+        // If input location is 0 input amount needs to be injected on the call
+        const inputLocs = args.amountIn==ethers.constants.Zero && !tx.value ? [56] : []   // In bytes
+
+        return { tx, inputLocs }   
+    }
+
+    async makeQuery({ amountIn, tknPath }) {
+        // Input amount needs to in base units of asset (eg. wei)
+        const queryContract = new ethers.Contract(
+            config.ROUTERS.UNIISH_PROXY, 
+            ABIS['uniswapRouterProxy']
+        )
+        let tx = await queryContract.populateTransaction.getOutputAmount(
+            this.routerAddress, 
+            amountIn, 
+            tknPath[0], 
+            tknPath[1]
+        )
+        // If input location is 0 input amount needs to be injected on the call
+        const inputLocs = amountIn==ethers.constants.Zero ? [88] : []   // In bytes
+
+        return { tx, inputLocs }
+    }
+}
+
+class Sushiswap extends Uniswap {
+
+    constructor(provider) {
+        super(provider)
+        this.routerAddress = ROUTERS.SUSHISWAP
+        this.approver = config.APPROVERS.SUSHISWAP
+        this.routerContract = new ethers.Contract(
+            this.routerAddress, 
+            ABIS['uniswapRouter']
+        )
+    }
+}
+
+class Crypto extends Uniswap {
+
+    constructor(provider) {
+        super(provider)
+        this.routerAddress = ROUTERS.CRYPTO
+        this.approver = config.APPROVERS.CRYPTO
+        this.routerContract = new ethers.Contract(
+            this.routerAddress, 
+            ABIS['uniswapRouter']
+        )
+    }
+}
+
+class Linkswap extends Uniswap {
+
+    constructor(provider) {
+        super(provider)
+        this.routerAddress = ROUTERS.LINKSWAP
+        this.approver = config.APPROVERS.LINKSWAP
+        this.routerContract = new ethers.Contract(
+            this.routerAddress, 
+            ABIS['uniswapRouter']
+        )
+    }
+}
+
+class Polyient extends Uniswap {
+
+    constructor(provider) {
+        super(provider)
+        this.routerAddress = ROUTERS.POLYIENT
+        this.approver = config.APPROVERS.POLYIENT
+        this.routerContract = new ethers.Contract(
+            this.routerAddress, 
+            ABIS['uniswapRouter']
+        )
+    }
+}
+
+class Whiteswap extends Uniswap {
+
+    constructor(provider) {
+        super(provider)
+        this.routerAddress = ROUTERS.WHITESWAP
+        this.approver = config.APPROVERS.WHITESWAP
+        this.routerContract = new ethers.Contract(
+            this.routerAddress, 
+            ABIS['uniswapRouter']
+        )
+    }
+}
+
+class Sashimiswap extends Uniswap {
+
+    constructor(provider) {
+        super(provider)
+        this.routerAddress = ROUTERS.SASHIMISWAP
+        this.approver = config.APPROVERS.SASHIMISWAP
+        this.routerContract = new ethers.Contract(
+            this.routerAddress, 
+            ABIS['uniswapRouter']
+        )
     }
 }
 
@@ -117,15 +247,19 @@ class DodoV1 {
 
     constructor(provider) {
         this.provider = provider
-        this.routerAddress = ROUTERS.DODO
+        this.routerAddress = config.ROUTERS.DODO
+        this.approver = config.APPROVERS.DODO
         this.routerContract = new ethers.Contract(
             this.routerAddress, 
-            ABIS['dodoRouter'], 
+            config.ABIS['dodoRouter'], 
             this.provider
         )
     }
 
     async fetchPoolState(poolAddress) {
+        if (!this.provider) {
+            throw new Error('This method call requires a web3 provider.')
+        }
         let methodsMap = {
             '_TARGET_QUOTE_TOKEN_AMOUNT_': 'Q0',
             '_TARGET_BASE_TOKEN_AMOUNT_': 'B0',
@@ -139,7 +273,7 @@ class DodoV1 {
         }
         const poolContract = new ethers.Contract(
             poolAddress, 
-            ABIS['dodoPool'], 
+            config.ABIS['dodoPool'], 
             this.provider
         )
         let response = Object.keys(methodsMap).map(async method => {
@@ -152,6 +286,9 @@ class DodoV1 {
     }
 
     async getPoolData(poolId, convert) {
+        if (!this.provider) {
+            throw new Error('This method call requires a web3 provider.')
+        }
         let pool = instrMng.poolIdMap[poolId]
         let poolInfo = await this.fetchPoolState(pool.address)
         if (convert) {
@@ -173,6 +310,10 @@ class DodoV1 {
     }
 
     getAmountOut(amountIn, poolData, tknOrder) {
+        console.log('Dodo getAmountOut')
+        console.log('amountIn', amountIn)
+        console.log('poolData', poolData)
+        console.log('tknOrder', tknOrder)
         let pool = instrMng.poolIdMap[poolData.poolId]
         // Buying quote or base?
         if (!tknOrder.includes(pool.tkns[0]) || !tknOrder.includes(pool.tkns[1])) {
@@ -200,6 +341,9 @@ class DodoV1 {
     }
 
     async queryBuyBaseToken(poolAddress, amount) {
+        if (!this.provider) {
+            throw new Error('This method call requires a web3 provider.')
+        }
         const poolContract = new ethers.Contract(
             poolAddress, 
             ABIS['dodoPool'], 
@@ -209,27 +353,34 @@ class DodoV1 {
     }
 
     async querySellBaseToken(poolAddress, amount) {
+        if (!this.provider) {
+            throw new Error('This method call requires a web3 provider.')
+        }
         const poolContract = new ethers.Contract(
             poolAddress, 
-            ABIS['dodoPool'], 
+            config.ABIS['dodoPool'], 
             this.provider
         )
         return poolContract.querySellBaseToken(amount)
     }
 
     async querySellQuoteToken(poolAddress, amount) {
-        const poolContract = new ethers.Contract(
-            poolAddress, 
-            ABIS['dodoPool'], 
+        if (!this.provider) {
+            throw new Error('This method call requires a web3 provider.')
+        }
+        const dodoSellHelper = new ethers.Contract(
+            config.DODO_HELPER, 
+            config.ABIS['dodoHelper'], 
             this.provider
         )
-        return poolContract.querySellBaseToken(amount)
+        return dodoSellHelper.querySellQuoteToken(poolAddress, amount)
     }
 
-    getDirections(poolPath, fromTkn, toTkn) {
+    getDirections(poolPath, fromTkn) {
         // This is string of bytes where position of each represents the direction of the trade
         // 0 -> basetkn to quotetkn
         // 1 -> quotetkn to basetkn
+        // TODO This wont work if multiple pools are passed!!!
         let directionsBytes = ''
         poolPath.forEach(poolId => {
             let pool = instrMng.poolAddressMap[poolId]
@@ -243,32 +394,72 @@ class DodoV1 {
     }
 
     async makeTrade(args, wethEnabled, deadlineOffset) {
+        // if (!this.provider) {
+        //     throw new Error('This method call requires a web3 provider.')
+        // }
         deadlineOffset = deadlineOffset || 300
-        let fromTkn = args.tknPath[0]==WETH_ADDRESS && !wethEnabled ? ETH_ADDRESS : args.tknPath[0]
-        let toTkn = args.tknPath[1]==WETH_ADDRESS && !wethEnabled ? ETH_ADDRESS : args.tknPath[1]
+        let fromTkn = args.tknPath[0]==config.WETH_ADDRESS && !wethEnabled ? config.ETH_ADDRESS : args.tknPath[0]
+        let toTkn = args.tknPath[1]==config.WETH_ADDRESS && !wethEnabled ? config.ETH_ADDRESS : args.tknPath[1]
         let deadline = Math.round((Date.now()/1000) + deadlineOffset)
-        let directions = this.getDirections(args.poolPath)
-        let txPayload = await this.routerContract.populateTransaction.dodoSwapV1(
+        let directions = this.getDirections(args.poolPath, fromTkn)
+        let amountOut = ethers.utils.parseUnits('1', 'wei')
+        let tx = await this.routerContract.populateTransaction.dodoSwapV1(
             fromTkn,
             toTkn,
             args.amountIn,
-            args.amountOut,
+            amountOut,
             args.poolPath,
             directions,
             false,
             deadline
         )
-        if (args.tknPath[0]==ETH_ADDRESS) {
-            txPayload.value = args.amountIn
+        if (fromTkn==config.ETH_ADDRESS) {
+            tx.value = args.amountIn
         }
-        return txPayload
+
+        // TODO Determine the input loc for Dodo trade transactions
+        const inputLocs = args.amountIn==ethers.constants.Zero ? [120] : []   // In bytes
+        return { tx, inputLocs }
+    }
+
+    async makeQuery({poolPath, tknPath, amountIn}) {
+        let poolAddress = poolPath[0] // TODO What if there are multiple pools in step?
+        let directions = this.getDirections(poolPath, tknPath[0])
+        let dodoSellHelper = new ethers.Contract(
+            config.DODO_HELPER, 
+            config.ABIS['dodoHelper']
+        )
+        // TODO Wont work for multiple swaps!
+        if (directions=='0') {
+            // Sell base
+            var tx = await dodoSellHelper.populateTransaction.querySellBaseToken(
+                poolAddress, 
+                amountIn
+            )
+        } else {
+            // Sell quote
+            var tx = await dodoSellHelper.populateTransaction.querySellQuoteToken(
+                poolAddress, 
+                amountIn
+            )
+        }
+        // If input location is 0 input amount needs to be injected on the call
+        // TODO Determine the input loc for Dodo trade transactionss
+        const inputLocs = amountIn==ethers.constants.Zero ? [88] : []   // In bytes
+        return { tx, inputLocs }
     }
 }
 
 function getExchanges(provider) {
     return {
+        sashimiswap: new Sashimiswap(provider),
+        sushiswap: new Sushiswap(provider), 
+        whiteswap: new Whiteswap(provider), 
+        linkswap: new Linkswap(provider), 
+        polyient: new Polyient(provider), 
         uniswap: new Uniswap(provider), 
-        dodo: new DodoV1(provider)
+        dodoV1: new DodoV1(provider),
+        crypto: new Crypto(provider), 
     }   
 }
 

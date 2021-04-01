@@ -125,6 +125,15 @@ async function queryDodoBuyBase(poolAddress, decimals) {
     return quoteAmountIn
 }
 
+async function queryDodoBuyQuote(poolAddress, decimals) {
+    let [ quoteDec, baseDec ] = decimals 
+    let dodo = EXCHANGES['dodo']
+    let buyQuoteAmount = ethers.utils.parseUnits('4', baseDec)  // Buy 4 Ether
+    let quoteAmountIn = await dodo.queryBuyBaseToken(poolAddress, buyBaseAmount)
+    console.log(`Swap ${ethers.utils.formatUnits(sellBaseAmount, baseDec)} ETH for ${ethers.utils.formatUnits(quoteAmountIn, quoteDec)} USDC`)
+    return quoteAmountIn
+}
+
 async function queryUniswapReserves(poolAddress, decimals) {
     let uniswap = EXCHANGES['uniswap']
     // Uniswap reserves are sorted by alphabetical order

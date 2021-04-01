@@ -1,6 +1,5 @@
 
 function baseShortageSellBase(baseAmount, pool){
-
     return pool.i*baseAmount*(1-pool.k+pool.k*((pool.B0**2)/(pool.B*(baseAmount+pool.B))))*0.995
 }
 
@@ -10,12 +9,15 @@ function baseShortageBuyBase(baseAmount, pool) {
 }
 
 function quoteShortageSellBase(baseAmount, pool){
-    let a = 1-pool.k;
+    console.log('Base amount', baseAmount)
+    console.log('pool', pool)
+    let a = 1-pool.k
     let b = ((pool.k*pool.Q0**2)/pool.Q)-pool.Q+pool.k*pool.Q-pool.i*-baseAmount;
     let c = -pool.k*pool.Q0**2
 
     return (pool.Q-((-b+(b**2-4*a*c)**(1/2))/(2*a)))*0.995
 }
+
 
 function quoteShortageBuyBase(baseAmount, pool) {
     baseAmount *= -1.005

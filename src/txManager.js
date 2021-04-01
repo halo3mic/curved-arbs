@@ -1,88 +1,244 @@
+const instrMng = require('../src/instrMng');
+const { getExchanges } = require('./exchanges');
+const ethers = require('ethers');
+const config = require('./config')
+const utils = require('./utils')
 
+var SIGNER, EXCHANGES, NONCE
 
-function unNormalizeUnits(num, dec) {
-    return ethers.utils.parseUnits(
-        // ethers.utils.formatUnits(num, dec)
-        num.toString(), dec
-    )
+async function init(provider, signer) {
+    EXCHANGES = getExchanges(provider, signer)
+    SIGNER = signer
+    NONCE = await signer.getTransactionCount()
 }
 
-/**
- * Helper function for submitting bytecode to Archer
- * @param {tx} tx 
- */
- function convertTxDataToByteCode(tx) {
-    const txData = tx.data
-    const dataBytes = ethers.utils.hexDataLength(txData);
-    const dataBytesHex = ethers.utils.hexlify(dataBytes);
-    const dataBytesPadded = ethers.utils.hexZeroPad(dataBytesHex, 32);
-
-    return ethers.utils.hexConcat([
-      tx.to, 
-      dataBytesPadded, 
-      txData
-    ]).split('0x')[1]
+function decToBigNumber(num, dec) {
+    return ethers.utils.parseUnits((num*10**dec).toFixed(0), 'wei')
 }
 
-function makeTradeFunction(steps) {
-    let tradeFunction = (inputAmount) => {
-        let amountOut = inputAmount
-        for (let step of steps) {
-            amountOut = step.exchange.getAmountOut(
-                amountOut,
-                step.poolData, 
-                step.tknOrder
-            )
-        }
-        let profit = amountOut - inputAmount
-        return profit
-    }
-    return tradeFunction
-}
-
-async function makeSteps(path) {
-    let steps = []
-    for (let i=0; i<path.pools.length; i++) {
-        let pool = instrMng.poolIdMap[path.pools[i]]
-        let tkns = path.tkns.slice(i, i+2)
-        let exchange = EXCHANGES[pool.exchange]
-        let poolData = await exchange.getPoolData(pool.id, true)
-        let step = {
-            poolId: pool.id, 
-            tknOrder: tkns,
-            exchange,
-            poolData, 
-        }
-        steps.push(step)
-    }
-    return steps
-}
-
-
-async function makeTradeForOpp(opp) {
-    let error = 0.05
-    let path = instrMng.pathIdMap[opp.pathId]
+async function makeTradeTx(opp) {
+    let error = 0
     let pool, tkns, amountIn, ethVal
-    let calldata = '0x'
-    for (let i=0; i<path.pools.length; i++) {
-        pool = instrMng.poolIdMap[path.pools[i]]
-        tkns = path.tkns.slice(i, i+2).map(tId=>instrMng.tknIdMap[tId])
+    let calldata = ''
+    let inputLocs = []
+    let amountOut = ethers.constants.Zero
+    for (let i=0; i<opp.path.pools.length; i++) {
+        pool = instrMng.poolIdMap[opp.path.pools[i]]
+        tkns = opp.path.tkns.slice(i, i+2).map(tId=>instrMng.tknIdMap[tId])
         tknAddresses = tkns.map(t=>t.address)
-
-        amountIn = unNormalizeUnits(opp.pathAmounts[i]*(1-error*i), tkns[0].decimal)
-        amountOut = unNormalizeUnits(opp.pathAmounts[i+1]*(1-error), tkns[1].decimal)
-
+        if (i==0 || !config.QUERY) {
+            // amountIn = utils.unNormalizeUnits(opp.swapAmounts[i]*(1-error*i), tkns[0].decimal)
+            amountIn = decToBigNumber(opp.swapAmounts[i]*(1-error*i), tkns[0].decimal)
+        } else {
+            amountIn = ethers.constants.Zero  // Pass in zero to replace this amount with query result during execution
+        }
         let step = {
             poolPath: [pool.address],
             tknPath: tknAddresses,
-            to: opp.from,
+            to: config.DISPATCHER,
             amountOut, 
             amountIn, 
         }
         txPayload = await EXCHANGES[pool.exchange].makeTrade(step, opp.wethEnabled)
-        console.log(txPayload)
-        ethVal = i==0 ? txPayload.value : ethVal
-        calldata += convertTxDataToByteCode(txPayload)
+        ethVal = i==0 ? txPayload.tx.value : ethVal
+        let _inputLoc = txPayload.inputLocs.map(loc => loc+calldata.length/2)  // Relative loc + Previous bytes
+        inputLocs = [...inputLocs, ..._inputLoc]
+        calldata += utils.convertTxDataToByteCode(txPayload.tx)
     }
-    return { calldata, ethVal }
+    calldata = '0x' + calldata
+    return { calldata, ethVal, inputLocs }
+}
+
+async function makeQueryTx(opp) {
+    let error = 0
+    let pool, tkns, amountIn, ethVal
+    let calldata = ''
+    let inputLocs = []
+    let amountOut = ethers.constants.Zero
+    for (let i=0; i<opp.path.pools.length; i++) {
+        pool = instrMng.poolIdMap[opp.path.pools[i]]
+        tkns = opp.path.tkns.slice(i, i+2).map(tId=>instrMng.tknIdMap[tId])
+        tknAddresses = tkns.map(t=>t.address)
+        if (i==0 || !config.QUERY) {
+            // amountIn = utils.unNormalizeUnits(opp.swapAmounts[i]*(1-error*i), tkns[0].decimal)
+            amountIn = decToBigNumber(opp.swapAmounts[i]*(1-error*i), tkns[0].decimal)
+        } else {
+            amountIn = ethers.constants.Zero  // Pass in zero to replace this amount with query result during execution
+        }
+        let step = {
+            poolPath: [pool.address],
+            tknPath: tknAddresses,
+            to: config.DISPATCHER,
+            amountOut, 
+            amountIn, 
+        }
+        txPayload = await EXCHANGES[pool.exchange].makeQuery(step, opp.wethEnabled)
+        ethVal = i==0 ? txPayload.tx.value : ethVal
+        let _inputLoc = txPayload.inputLocs.map(loc => loc+calldata.length/2)  // Relative loc + Previous bytes
+        inputLocs = [...inputLocs, ..._inputLoc]
+        calldata += utils.convertTxDataToByteCode(txPayload.tx)
+    }
+    calldata = '0x' + calldata
+    return { calldata, ethVal, inputLocs }
+}
+
+async function makeDispatcherTxWithQuery(tradeTx, queryTx, gasPrice, nonce) {
+    let dispatcher = new ethers.Contract(
+        config.DISPATCHER, 
+        config.ABIS['dispatcher'], 
+        SIGNER
+    )
+    let makeTradeArgs = [
+        queryTx.calldata,
+        queryTx.inputLocs, 
+        tradeTx.calldata, 
+        tradeTx.inputLocs,
+        tradeTx.ethVal,  // TODO Target price => the last query return should be greater than this (account for gas)
+        tradeTx.ethVal,  // ETH input value
+    ]
+    gasPrice = ethers.utils.parseUnits(gasPrice, 'gwei')
+    let txArgs = {
+        gasPrice, 
+        gasLimit: config.GAS_LIMIT, 
+        nonce: nonce
+    }
+    let tx = await dispatcher.populateTransaction['makeTrade(bytes,uint256[],bytes,uint256[],uint256,uint256)'](
+            ...makeTradeArgs, 
+            txArgs
+        ).catch(e=>console.log('Failed to populate dispatcher tx:', e))
+    if (process.argv.includes('--simulate')) {
+        try {
+            await SIGNER.estimateGas(tx)
+        } catch (e) {
+            console.log('ABORTING: Transaction would fail')
+            console.log(Object.values(e)[2].response)
+        }
+    }
+    console.log(tx)
+    tx = await SIGNER.signTransaction(tx)
+    return tx
+}
+
+async function makeDispatcherTxWithoutQuery(tradeTx, gasPrice, nonce) {
+    let dispatcher = new ethers.Contract(
+        config.DISPATCHER, 
+        config.ABIS['dispatcher'], 
+        SIGNER
+    )
+    gasPrice = ethers.utils.parseUnits(gasPrice, 'gwei')
+    let makeTradeArgs = [
+        tradeTx.calldata, 
+        tradeTx.ethVal,  // ETH input value
+    ]
+    let txArgs = {
+        gasPrice: gasPrice, 
+        gasLimit: config.GAS_LIMIT, 
+        nonce: nonce
+    }
+    console.log(makeTrade)
+    console.log(txArgs)
+    return dispatcher.populateTransaction['makeTrade(bytes,uint256)'](
+            ...makeTradeArgs, 
+            txArgs
+        ).catch(e=>console.log('Failed to populate dispatcher tx:', e))
+}
+
+// async function executeOpp(opp) {
+//     let tradeTx = await makeTradeTx(opp)
+//     if (!config.QUERY) {
+//         var dispatcherTx = await makeDispatcherTxWithoutQuery(
+//             tradeTx,
+//             opp.gasPrice, 
+//             NONCE
+//         )
+//         console.log(dispatcherTx)
+//     } else {
+//         let queryTx = await makeQueryTx(opp)
+//         var dispatcherTx = await makeDispatcherTxWithQuery(
+//             tradeTx, 
+//             queryTx
+//         )
+//         console.log(dispatcherTx)
+//     }
+//     return dispatcherTx
+// }
+
+async function executeOpps(opps, blockNumber) {
+    return executeBatches(opps, blockNumber)
+}
+
+async function executeBatches(opps, blockNumber) {
+    let nonce = await SIGNER.getTransactionCount()
+    let bundle = []
+    for (let opp of opps) {
+        let tradeTx = await makeTradeTx(opp)
+        let queryTx = await makeQueryTx(opp)
+        let dispatcherTx = await makeDispatcherTxWithQuery(
+            tradeTx, 
+            queryTx,
+            opp.gasPrice, 
+            nonce
+        )  // signed
+        if (dispatcherTx) {
+            bundle.push(dispatcherTx)
+            nonce ++
+        }
+    }
+    if (bundle.length>0) {
+        try {
+            if (process.argv.includes('--call')) {
+                console.log('Calling batching...')
+                return callBatches(bundle, blockNumber+1)
+            } else {
+                console.log('Sending batches...')
+                return callBatches(bundle, blockNumber+1)
+            }
+        } catch (e) {
+            console.log(e)
+        }
+    }
+}
+
+async function callBatches(bundles, targetBlock, debugOnly=false) {
+    const ethCall = {
+        method: 'eth_callBundle', 
+        params: [
+            bundles, 
+            '0x'+targetBlock.toString(16), 
+            'latest'
+        ], 
+        id: '1', 
+        jsonrpc: '2.0'
+    }
+    let inter = ethers.utils.id(JSON.stringify(ethCall))
+    let signature = await SIGNER.signMessage(inter)
+    let senderAddress = SIGNER.address
+    let archerApiParams = {
+        ethCall, 
+        signature, 
+        senderAddress
+    }
+    if (debugOnly || process.argv.includes('--debug')) {
+        console.log(archerApiParams)
+        console.log(archerApiParams['ethCall']['params'][0])
+        process.exit(0)
+    }
+    let t0 = Date.now()
+    let response = await utils.submitBatchesToArcher(archerApiParams)
+    // console.log(await response.json())
+    let t1 = Date.now()
+    console.log(`Latency: ${t1-t0} ms`)
+    // console.log(response.body)
+    // utils.logToCsv(archerApiParams, config.ARCHER_REQUESTS_LOGS_PATH)
+    let savePath = response.status=='error' ? config.ARCHER_FAIL_LOGS_PATH : config.ARCHER_PASS_LOGS_PATH
+    // utils.logToCsv(response, savePath)
+    return response.json()
+}
+
+module.exports = {
+    makeDispatcherTxWithQuery,
+    makeQueryTx,
+    makeTradeTx,
+    executeOpps,
+    init,
 }
