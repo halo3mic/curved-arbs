@@ -1,26 +1,28 @@
+const ethers = require('ethers')
+const bn = require('bignumber.js')
+
+let d1000 = ethers.BigNumber.from("1000");
+let d995 = ethers.BigNumber.from("995");
 
 function baseShortageSellBase(baseAmount, pool){
-    return pool.i*baseAmount*(1-pool.k+pool.k*((pool.B0**2)/(pool.B*(baseAmount+pool.B))))*0.995
+    return pool.i*baseAmount*(1-pool.k+pool.k*((pool.B0**2)/(pool.B*(baseAmount+pool.B))))*(1-pool.lpFee)
 }
 
 function baseShortageBuyBase(baseAmount, pool) {
-    baseAmount *= -1.005
+    baseAmount *= -(1-pool.lpFee)
     return -pool.i*baseAmount*(1-pool.k+pool.k*((pool.B0**2)/(pool.B*(baseAmount+pool.B))))
 }
 
 function quoteShortageSellBase(baseAmount, pool){
-    console.log('Base amount', baseAmount)
-    console.log('pool', pool)
-    let a = 1-pool.k
-    let b = ((pool.k*pool.Q0**2)/pool.Q)-pool.Q+pool.k*pool.Q-pool.i*-baseAmount;
+    let a = 1-pool.k;
+    let b = ((pool.k*pool.Q0**2)/pool.Q)-pool.Q+pool.k*pool.Q+pool.i*baseAmount;
     let c = -pool.k*pool.Q0**2
 
-    return (pool.Q-((-b+(b**2-4*a*c)**(1/2))/(2*a)))*0.995
+    return (pool.Q-((-b+(b**2-4*a*c)**(1/2))/(2*a)))*(1-pool.lpFee)
 }
 
-
 function quoteShortageBuyBase(baseAmount, pool) {
-    baseAmount *= -1.005
+    baseAmount *= -(1+pool.lpFee)
     let a = 1-pool.k;
     let b = ((pool.k*pool.Q0**2)/pool.Q)-pool.Q+pool.k*pool.Q-pool.i*baseAmount;
     let c = -pool.k*pool.Q0**2
@@ -33,24 +35,24 @@ function baseShortageSellQuote(quoteAmount, pool){
     let b = ((pool.k*pool.B0**2)/pool.B)-pool.B+pool.k*pool.B-(-quoteAmount/pool.i);
     let c = -pool.k*pool.B0**2
 
-    return (pool.B-((-b+(b**2-4*a*c)**(1/2))/(2*a)))*0.995
+    return (pool.B-((-b+(b**2-4*a*c)**(1/2))/(2*a)))*(1-pool.lpFee)
 }
 
 function baseShortageBuyQuote(quoteAmount, pool) {
-    quoteAmount *= -1.005
-    let a = 1-pool.k;
+    quoteAmount *= -(1+pool.lpFee)
+    let a = 1-pool.k
     let b = ((pool.k*pool.B0**2)/pool.B)-pool.B+pool.k*pool.B-(quoteAmount/pool.i);
     let c = -pool.k*pool.B0**2
 
     return (pool.B-((-b+(b**2-4*a*c)**(1/2))/(2*a)))
 }
 
-function quoteShortageSellQuote(quoteAmount, pool){
-    return (quoteAmount/pool.i)*(1-pool.k+pool.k*((pool.Q0**2)/(pool.Q*(quoteAmount+pool.Q))))*0.995
+function quoteShortageSellQuote(quoteAmount, pool) {
+    return (quoteAmount/pool.i)*(1-pool.k+pool.k*((pool.Q0**2)/(pool.Q*(quoteAmount+pool.Q))))*(1-pool.lpFee)
 }
 
 function quoteShortageBuyQuote(quoteAmount, pool) {
-    quoteAmount *= -1.005
+    quoteAmount *= -(1+pool.lpFee)
     return -(quoteAmount/pool.i)*(1-pool.k+pool.k*((pool.Q0**2)/(pool.Q*(quoteAmount+pool.Q))))
 }
 

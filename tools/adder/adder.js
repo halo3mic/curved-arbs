@@ -205,7 +205,7 @@ class PoolManager extends Manager {
             return await tknMng.getFromAddress(tknAdd)
         }))
         poolData['tkns'] = tkns.map(t => {
-            return {id: t.id, weight: 0.5}
+            return t.id
         })
         poolData['symbol'] = tkns.map(t => t.symbol).join('').toLowerCase()
         poolData['symbol'] += '_' + exchange
@@ -331,7 +331,8 @@ class InstructionManager {
             let newPath = path.length>0 ? [...path] : [tokenIn]
             let tempOut
             let pair = pairs[i]
-            let pairTkns = pair.tkns.map(t=>t.id)
+            let pairTkns = pair.tkns
+            // console.log(tokenIn, pairTkns, pairTkns[0], pairTkns[1])
             if (tokenIn!=pairTkns[0] && tokenIn!=pairTkns[1]) {
                 continue
             } else if (tokenIn==pairTkns[0]) {
@@ -501,7 +502,7 @@ class ApprovalsManager {
         pools.forEach(p => {
             let spender = this.exchanges[p.exchange].approver
             p.tkns.forEach(t => {
-                let tknAddress = tkns.filter(tObj=>tObj.id==t.id)[0].address
+                let tknAddress = tkns.filter(tObj=>tObj.id==t)[0].address
                 if (!Object.keys(approvalsNeeded).includes(tknAddress)) {
                     approvalsNeeded[tknAddress] = [spender]
                 } else if (!approvalsNeeded[tknAddress].includes(spender)) {

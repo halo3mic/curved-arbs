@@ -6,6 +6,7 @@ const txMng = require('../src/txManager')
 const config = require('../src/config')
 const instrMng = require('../src/instrMng')
 const arbbot = require('../src/arbbot')
+const formulas = require('../src/formulas')
 
 
 const { provider, signer } = providers.ws
@@ -167,26 +168,58 @@ async function makeTradeForOppDemo() {
 }
 
 async function resimulatePastOpp() {
-    let forkBlock = 12152703
+    // let forkBlock = 12194675
+    let forkBlock = 11907345
     let dispatcher = config.DISPATCHER
     let unlocked_accounts = [dispatcher]
-    // let gp = utils.getForkProvider(forkBlock, {unlocked_accounts})
-    // let signer = gp.getSigner(dispatcher)
-    await arbbot.init(provider, signer)
-    console.log('Initialization complete!')
-    // arbbot.handleUpdate(forkBlock, false)
-    let exchanges = getExchanges(provider)
-    let poolData = arbbot.getPoolData()['P00250']
-    let amountOut = exchanges.dodoV1.getAmountOut(
-        1, 
-        poolData,
-        [
-            'T0022', 
-            'T0003'
-        ]
-    )
+    let gp = utils.getForkProvider(forkBlock, {unlocked_accounts})
+    let signer = gp.getSigner(dispatcher)
+    await arbbot.init(gp, signer)
+    // console.log('Initialization complete!')
+    // let path = instrMng.pathIdMap['I00026']
+    // let optimalAmount = arbbot.optimalAmountForPath(path)
+    // console.log(optimalAmount)
+    // let steps = arbbot._makeSteps(path)
+    // let swapAmounts = arbbot.getSwapAmounts(41, steps)
+    // console.log(steps)
+    // console.log(swapAmounts)
+
+    // let exchanges = arbbot._getExchanges()
+    await arbbot.handleUpdate(forkBlock)
+    // let exchanges = getExchanges(gp)
+    // let poolData = await exchanges.dodoV1.getPoolData('P00254', true)
+    // let amountOut = exchanges.dodoV1.getAmountOut(
+    //     // ethers.utils.parseUnits('1', 6), 
+    //     40,
+    //     poolData,
+    //     [
+    //         'T0000',
+    //         'T0003', 
+    //     ]
+    // )
+    // // console.log(poolData)
+    // console.log(amountOut)
+    
+}
+
+function testBigNumber() {
+    let amountIn = 1
+    let poolData = {
+        Q0: 9298,
+        B0: 8479,
+        tradeAllowed: true,
+        lpFee: 0.0001,
+        Q: 9074,
+        i: 1,
+        B: 8280,
+        R: 2,
+        k: 0.0002,
+        poolId: 'P00250'
+      }
+    let amountOut = formulas.dodo.quoteShortageSellBase(amountIn, poolData)
     console.log(amountOut)
 }
+
 
 // executeTradesViaDispatcherSeperate()
 // executeTradesViaDispatcherTogether()

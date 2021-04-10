@@ -8,10 +8,11 @@ const ethers = require('ethers')
 var EXCHANGES
 var POOL_DATA
 var GAS_PRICE = 0  // TODO make it dynamic
+var OPPS_DETECTED = 0
 
 async function init(provider, signer) {
     EXCHANGES = getExchanges(provider)
-    POOL_DATA = await fetchPoolData()
+    // POOL_DATA = await fetchPoolData()
     await txMng.init(provider, signer)
 }
 
@@ -22,6 +23,10 @@ function updateGasPrice(gasPrice) {
 
 function getPoolData() {
     return POOL_DATA
+}
+
+function _getExchanges() {
+    return EXCHANGES
 }
 
 async function fetchPoolData() {
@@ -36,9 +41,7 @@ async function fetchPoolData() {
 }
 
 function estimateGasAmount(nSteps) {
-    let gasPerStep = ethers.BigNumber.from("140000")
-    let totalGas = gasPerStep.mul(nSteps)
-    return totalGas
+    return 140000*nSteps
 }
 
 
@@ -46,16 +49,20 @@ async function handleUpdate(blockNumber, forward=true) {
     POOL_DATA = await fetchPoolData()
     let opps = instrMng.paths.map(path => {
         let { amountIn, profit, swapAmounts } = optimalAmountForPath(path)
+        // console.log(path.symbol, 'profit:', profit)
         if (profit > MIN_PROFIT) {
             let gasAmount = estimateGasAmount(path.pools.length)
-            let gasPrice = process.argv.includes('--zero-gas') ? '0' : GAS_PRICE
-            console.log(GAS_PRICE, gasPrice)
-            let gasCost = parseFloat(gasAmount)*parseFloat(gasPrice)/1e9
+            // let gasPrice = process.argv.includes('--zero-gas') ? '0' : GAS_PRICE
+            // console.log(GAS_PRICE, gasPrice)
+            let gasCost = gasAmount*parseFloat(GAS_PRICE)/1e9
             let netProfit = profit - gasCost  // TODO: This only holds if input asset is ETH or WETH
-            if (netProfit > 0) {
+            if (netProfit > MIN_PROFIT || process.argv.includes('--zero-gas')) {
+                // gasPrice = (1e9*profit*0.9/gasAmount).toFixed(0)  // Send 90% of profits to the miner
                 return {
-                    gasPrice, 
+                    gasPrice: GAS_PRICE, 
+                    gasAmount,
                     grossProfit: profit, 
+                    blockNumber,
                     swapAmounts,
                     netProfit, 
                     amountIn, 
@@ -66,20 +73,26 @@ async function handleUpdate(blockNumber, forward=true) {
     }).filter(e=>e)
     if (opps.length>0) {
         // TODO Get parallel opps
-        let oppsSorted = opps.sort((a, b) => a.netProfit-b.netProfit)
+        OPPS_DETECTED += opps.length
+        let oppsSorted = opps.sort((a, b) => b.netProfit-a.netProfit)
         handleOpps(blockNumber, [oppsSorted[0]], forward)
     } else {
         console.log('No opportunities detected')
     }
+    console.log('Opps detected so far:', OPPS_DETECTED)
 }
 
 async function handleOpps(blockNumber, opps, forward=true) {
     console.log(opps)
-    if (forward) {
-        let response = await txMng.executeOpps(opps, blockNumber)
-        console.log(response['result'])
+    try {
+        if (forward) {
+            let response = await txMng.executeOpps(opps, blockNumber).catch(console.log)
+            console.log(response['result'])
+        }
+        opps.forEach(printOpportunityInfo)
+    } catch (e) {
+        console.log(e)
     }
-    opps.forEach(printOpportunityInfo)
 }
 
 function optimalAmountForPath(path) {
@@ -166,9 +179,12 @@ function getSwapAmounts(inputAmount, steps) {
 
 module.exports = {
     optimalAmountForPath,
+    getSwapAmounts,
     updateGasPrice,
     fetchPoolData,
+    _getExchanges,
     handleUpdate,
     getPoolData,
+    _makeSteps,
     init,
 }

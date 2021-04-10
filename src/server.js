@@ -10,7 +10,7 @@ const utils = require('./utils')
 
 const uniswapSyncTopic = '0x1c411e9a96e071241c2f21f7726b17ae89e3cab4c78be50e062b03a9fffbbad1'  // Sync(uint112 reserve0, uint112 reserve1)
 let gasSpeed = 'fast'
-let gasLoopTimeout = 2000  // ms
+let gasLoopTimeout = 10000  // ms
 const poolAddresses = pools.map(p=>p.address)
 
 async function init() {
@@ -29,7 +29,7 @@ function startListeningForBlocks() {
 }
 
 async function startGasUpdates() {
-    let gasSpeed = 'fast'
+    let gasSpeed = 'rapid'
     while (1) {
         try {
             let gasPrice = await utils.fetchGasPrice(gasSpeed)
@@ -37,8 +37,10 @@ async function startGasUpdates() {
         } catch (e) {
             console.log('Failed to fetch gas price')
             console.log(e)
+            utils.sleep(gasLoopTimeout)
+        } finally {
+            utils.sleep(gasLoopTimeout)
         }
-        utils.sleep(gasLoopTimeout)
     }
 }
 

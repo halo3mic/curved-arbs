@@ -133,7 +133,7 @@ async function fetchGasPrice(speed) {
     let speedOptions = [
         'fast', 
         'rapid', 
-        'normal',
+        'standard',
         'slow' 
     ]
     if (!speedOptions.includes(speed)) {

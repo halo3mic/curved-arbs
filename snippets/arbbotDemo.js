@@ -111,4 +111,9 @@ async function executeCurrentArb() {
     await arbbot.handleUpdate(blockNumber)
 }
 
+async function simulatePastArb() {
+    // https://etherscan.io/tx/0xb1a33314e0cebaef84b04d81dc7583d08b9702a3037f5dd44340252d8d66b5d5
+    
+}
+
 executeCurrentArb()

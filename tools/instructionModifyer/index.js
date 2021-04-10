@@ -109,8 +109,9 @@ function simpleTknsForPools() {
     let dstInstrPath = resolve(`${__dirname}/../../config/pools.json`) 
     let srcInstrPath = resolve(`${__dirname}/../../config/pools.json`) 
     let currData = getCurrentData(srcInstrPath)
-    let modified = currData.filter(e => {
-        return e.tkns = e.tkns.map(t => t.id)
+    let modified = currData.map(e => {
+        e.tkns = e.tkns.map(t => t.id ? t.id : t)
+        return e
     })
     save(modified, dstInstrPath)
 }

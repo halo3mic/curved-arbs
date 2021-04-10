@@ -11,6 +11,7 @@ async function compare({
         strategy,
         tknOrder,
         aboveEq, 
+        amount,
     }) {
     let forkProvider = utils.getForkProvider(forkBlock)
     let dodo = getExchanges(forkProvider)['dodoV1']
@@ -22,7 +23,7 @@ async function compare({
         console.log(e)
     })
     let amountInOffset = Math.abs(poolInfo.B0-poolInfo.B)
-    let amountIn = Math.round(aboveEq ? amountInOffset*10 : amountInOffset*0.1)
+    let amountIn = amount || Math.round(aboveEq ? amountInOffset*10 : amountInOffset*0.1)
     let amountInBN = ethers.utils.parseUnits(amountIn.toString(), decimals[0])
     let isBaseShortage = poolInfo.B < poolInfo.B0
     let isEquilibrium = poolInfo.B == poolInfo.B0
@@ -54,7 +55,7 @@ function getAmountOutQuoteShortageSellQuoteTknBelowEq() {
     let settings = {
         aboveEq: false, 
         poolAddress: '0x75c23271661d9d143DCb617222BC4BEc783eff34', 
-        tknOrder: [ 'T0001', 'T0000' ], 
+        tknOrder: [ 'T0003', 'T0000' ], 
         forkBlock: 11907345, 
         methodCall: 'querySellQuoteToken', 
         strategy: 'quote-shortage | sell-quote | below-equilibrium',
@@ -66,10 +67,10 @@ function getAmountOutQuoteShortageSellQuoteTknAboveEq() {
     let settings = {
         aboveEq: true, 
         poolAddress: '0x75c23271661d9d143DCb617222BC4BEc783eff34', 
-        tknOrder: [ 'T0001', 'T0000' ], 
+        tknOrder: [ 'T0003', 'T0000' ], 
         forkBlock: 11907345, 
         methodCall: 'querySellQuoteToken', 
-        strategy: 'quote-shortage | sell-quote | below-equilibrium',
+        strategy: 'quote-shortage | sell-quote | above-equilibrium',
     }
     compare(settings)
 }
@@ -79,7 +80,7 @@ function getAmountOutQuoteShortageSellBaseTknBelowEq() {
     let settings = {
         aboveEq: false, 
         poolAddress: '0x75c23271661d9d143DCb617222BC4BEc783eff34', 
-        tknOrder: [ 'T0000', 'T0001' ], 
+        tknOrder: [ 'T0000', 'T0003' ], 
         forkBlock: 11907345, 
         methodCall: 'querySellBaseToken', 
         strategy: 'quote-shortage | sell-quote | below-equilibrium',
@@ -91,7 +92,7 @@ function getAmountOutQuoteShortageSellBaseTknAboveEq() {
     let settings = {
         aboveEq: true, 
         poolAddress: '0x75c23271661d9d143DCb617222BC4BEc783eff34', 
-        tknOrder: [ 'T0000', 'T0001' ], 
+        tknOrder: [ 'T0000', 'T0003' ], 
         forkBlock: 11907345, 
         methodCall: 'querySellBaseToken', 
         strategy: 'quote-shortage | sell-quote | below-equilibrium',
@@ -104,11 +105,11 @@ function getAmountOutQuoteShortageSellBaseTknAboveEq() {
 function getAmountOutBaseShortageSellQuoteTknBelowEq() {
     let settings = {
         aboveEq: false, 
-        poolAddress: '0x75c23271661d9d143DCb617222BC4BEc783eff34', 
-        tknOrder: [ 'T0001', 'T0000' ], 
+        poolAddress: '0x0D04146B2Fe5d267629a7eb341Fb4388DcdBD22f', 
+        tknOrder: [ 'T0003', 'T0018' ], 
         forkBlock: 11907386, 
         methodCall: 'querySellQuoteToken', 
-        strategy: 'quote-shortage | sell-quote | below-equilibrium',
+        strategy: 'base-shortage | sell-quote | below-equilibrium',
     }
     compare(settings)
 }
@@ -116,11 +117,11 @@ function getAmountOutBaseShortageSellQuoteTknBelowEq() {
 function getAmountOutBaseShortageSellQuoteTknAboveEq() {
     let settings = {
         aboveEq: true, 
-        poolAddress: '0x75c23271661d9d143DCb617222BC4BEc783eff34', 
-        tknOrder: [ 'T0001', 'T0000' ], 
+        poolAddress: '0x0D04146B2Fe5d267629a7eb341Fb4388DcdBD22f', 
+        tknOrder: [ 'T0003', 'T0018' ], 
         forkBlock: 11907386, 
         methodCall: 'querySellQuoteToken', 
-        strategy: 'quote-shortage | sell-quote | below-equilibrium',
+        strategy: 'base-shortage | sell-quote | above-equilibrium',
     }
     compare(settings)
 }
@@ -130,7 +131,7 @@ function getAmountOutBaseShortageSellBaseTknBelowEq() {
     let settings = {
         aboveEq: false, 
         poolAddress: '0x75c23271661d9d143DCb617222BC4BEc783eff34', 
-        tknOrder: [ 'T0000', 'T0001' ], 
+        tknOrder: [ 'T0000', 'T0003' ], 
         forkBlock: 11907386, 
         methodCall: 'querySellBaseToken', 
         strategy: 'quote-shortage | sell-quote | below-equilibrium',
@@ -142,10 +143,25 @@ function getAmountOutBaseShortageSellBaseTknAboveEq() {
     let settings = {
         aboveEq: true, 
         poolAddress: '0x75c23271661d9d143DCb617222BC4BEc783eff34', 
-        tknOrder: [ 'T0000', 'T0001' ], 
+        tknOrder: [ 'T0000', 'T0003' ], 
         forkBlock: 11907386, 
         methodCall: 'querySellBaseToken', 
         strategy: 'quote-shortage | sell-quote | below-equilibrium',
+    }
+    compare(settings)
+}
+
+/////  OTHER  \\\\\
+
+function sellQuoteCompUsdc() {
+    let settings = {
+        aboveEq: true, 
+        poolAddress: '0x0D04146B2Fe5d267629a7eb341Fb4388DcdBD22f', // COMP-USDC
+        tknOrder: [ 'T0003', 'T0018' ], 
+        forkBlock: 12191626, 
+        methodCall: 'querySellQuoteToken', 
+        strategy: '??? | sell-quote | ???',
+        amount: 100
     }
     compare(settings)
 }
@@ -156,7 +172,10 @@ function getAmountOutBaseShortageSellBaseTknAboveEq() {
 // getAmountOutQuoteShortageSellBaseTknBelowEq()
 // getAmountOutQuoteShortageSellBaseTknAboveEq()
 
-getAmountOutBaseShortageSellQuoteTknBelowEq()
-getAmountOutBaseShortageSellQuoteTknAboveEq()
-getAmountOutBaseShortageSellBaseTknBelowEq()
-getAmountOutBaseShortageSellBaseTknAboveEq()
+// getAmountOutBaseShortageSellQuoteTknBelowEq()
+// getAmountOutBaseShortageSellQuoteTknAboveEq()
+// getAmountOutBaseShortageSellBaseTknBelowEq()
+// getAmountOutBaseShortageSellBaseTknAboveEq()
+
+
+sellQuoteCompUsdc()

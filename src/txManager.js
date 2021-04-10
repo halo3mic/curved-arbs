@@ -7,6 +7,7 @@ const utils = require('./utils')
 var SIGNER, EXCHANGES, NONCE
 
 async function init(provider, signer) {
+    PROVIDER = provider
     EXCHANGES = getExchanges(provider, signer)
     SIGNER = signer
     NONCE = await signer.getTransactionCount()
@@ -14,6 +15,14 @@ async function init(provider, signer) {
 
 function decToBigNumber(num, dec) {
     return ethers.utils.parseUnits((num*10**dec).toFixed(0), 'wei')
+}
+
+function makeMinerTip(opp) {
+    // Pay % of the gross profit to TipJar
+    let tipAmount = opp.grossProfit * config.TIP_PRCT / 100
+    console.log('Miner will be tipped', tipAmount, 'eth')
+    let tipJar = new ethers.Contract(config.TIP_JAR, config.ABIS['tipJar'])
+
 }
 
 async function makeTradeTx(opp) {
@@ -109,58 +118,41 @@ async function makeDispatcherTxWithQuery(tradeTx, queryTx, gasPrice, nonce) {
     if (process.argv.includes('--simulate')) {
         try {
             await SIGNER.estimateGas(tx)
+            console.log('Tx would pass!')
         } catch (e) {
             console.log('ABORTING: Transaction would fail')
             console.log(Object.values(e)[2].response)
+            console.log(tx)
+            return
         }
     }
-    console.log(tx)
+    // console.log(tx)
     tx = await SIGNER.signTransaction(tx)
     return tx
 }
 
-async function makeDispatcherTxWithoutQuery(tradeTx, gasPrice, nonce) {
-    let dispatcher = new ethers.Contract(
-        config.DISPATCHER, 
-        config.ABIS['dispatcher'], 
-        SIGNER
-    )
-    gasPrice = ethers.utils.parseUnits(gasPrice, 'gwei')
-    let makeTradeArgs = [
-        tradeTx.calldata, 
-        tradeTx.ethVal,  // ETH input value
-    ]
-    let txArgs = {
-        gasPrice: gasPrice, 
-        gasLimit: config.GAS_LIMIT, 
-        nonce: nonce
-    }
-    console.log(makeTrade)
-    console.log(txArgs)
-    return dispatcher.populateTransaction['makeTrade(bytes,uint256)'](
-            ...makeTradeArgs, 
-            txArgs
-        ).catch(e=>console.log('Failed to populate dispatcher tx:', e))
-}
-
-// async function executeOpp(opp) {
-//     let tradeTx = await makeTradeTx(opp)
-//     if (!config.QUERY) {
-//         var dispatcherTx = await makeDispatcherTxWithoutQuery(
-//             tradeTx,
-//             opp.gasPrice, 
-//             NONCE
-//         )
-//         console.log(dispatcherTx)
-//     } else {
-//         let queryTx = await makeQueryTx(opp)
-//         var dispatcherTx = await makeDispatcherTxWithQuery(
-//             tradeTx, 
-//             queryTx
-//         )
-//         console.log(dispatcherTx)
+// async function makeDispatcherTxWithoutQuery(tradeTx, gasPrice, nonce) {
+//     let dispatcher = new ethers.Contract(
+//         config.DISPATCHER, 
+//         config.ABIS['dispatcher'], 
+//         SIGNER
+//     )
+//     gasPrice = ethers.utils.parseUnits(gasPrice, 'gwei')
+//     let makeTradeArgs = [
+//         tradeTx.calldata, 
+//         tradeTx.ethVal,  // ETH input value
+//     ]
+//     let txArgs = {
+//         gasPrice: gasPrice, 
+//         gasLimit: config.GAS_LIMIT, 
+//         nonce: nonce
 //     }
-//     return dispatcherTx
+//     console.log(makeTrade)
+//     console.log(txArgs)
+//     return dispatcher.populateTransaction['makeTrade(bytes,uint256)'](
+//             ...makeTradeArgs, 
+//             txArgs
+//         ).catch(e=>console.log('Failed to populate dispatcher tx:', e))
 // }
 
 async function executeOpps(opps, blockNumber) {
@@ -186,13 +178,18 @@ async function executeBatches(opps, blockNumber) {
     }
     if (bundle.length>0) {
         try {
+            if (process.argv.includes('--direct-submission')) {
+                console.log('Direct submission to chain...')
+                return submitToChain(bundle)
+            }
             if (process.argv.includes('--call')) {
                 console.log('Calling batching...')
                 return callBatches(bundle, blockNumber+1)
             } else {
                 console.log('Sending batches...')
-                return callBatches(bundle, blockNumber+1)
+                return sendBatches(bundle, blockNumber+1)
             }
+            
         } catch (e) {
             console.log(e)
         }
@@ -225,15 +222,70 @@ async function callBatches(bundles, targetBlock, debugOnly=false) {
     }
     let t0 = Date.now()
     let response = await utils.submitBatchesToArcher(archerApiParams)
-    // console.log(await response.json())
+    let responseJson = await response.json()
+    console.log(responseJson)
     let t1 = Date.now()
     console.log(`Latency: ${t1-t0} ms`)
     // console.log(response.body)
-    // utils.logToCsv(archerApiParams, config.ARCHER_REQUESTS_LOGS_PATH)
+    utils.logToCsv({
+        targetBlock, 
+        body: JSON.stringify(archerApiParams)
+    }, config.ARCHER_REQUESTS_LOGS_PATH)
     let savePath = response.status=='error' ? config.ARCHER_FAIL_LOGS_PATH : config.ARCHER_PASS_LOGS_PATH
-    // utils.logToCsv(response, savePath)
-    return response.json()
+    utils.logToCsv({
+        bundleHash: responseJson['result'].bundleHash, 
+        coinbaseDiff: responseJson['result'].coinbaseDiff, 
+        results: JSON.stringify(responseJson['result']['results'])
+    }, savePath)
+    return responseJson
 }
+
+async function sendBatches(bundles, targetBlock, debugOnly=false) {
+    const ethCall = {
+        method: 'eth_sendBundle', 
+        params: [
+            bundles, 
+            '0x'+targetBlock.toString(16)
+        ], 
+        id: '1', 
+        jsonrpc: '2.0'
+    }
+    let inter = ethers.utils.id(JSON.stringify(ethCall))
+    let signature = await SIGNER.signMessage(inter)
+    let senderAddress = SIGNER.address
+    let archerApiParams = {
+        ethCall, 
+        signature, 
+        senderAddress
+    }
+    if (debugOnly) {
+        return archerApiParams
+    }
+    let t0 = Date.now()
+    let response = await utils.submitBatchesToArcher(archerApiParams)
+    let responseJson = await response.json()
+    console.log(responseJson)
+    let t1 = Date.now()
+    console.log(`Latency: ${t1-t0} ms`)
+    // console.log(response.body)
+    utils.logToCsv({
+        targetBlock, 
+        body: JSON.stringify(archerApiParams)
+    }, config.ARCHER_REQUESTS_LOGS_PATH)
+    let savePath = response.status=='error' ? config.ARCHER_FAIL_LOGS_PATH : config.ARCHER_PASS_LOGS_PATH
+    utils.logToCsv({
+        bundleHash: targetBlock,
+        result: JSON.stringify(responseJson['result'])
+    }, savePath)
+    return responseJson
+}
+
+async function submitToChain(bundles) {
+    let response = await PROVIDER.send('eth_sendRawTransaction', [bundles[0]])
+    let txReceipt = await PROVIDER.waitForTransaction(response.hash)
+    return txReceipt
+}
+
 
 module.exports = {
     makeDispatcherTxWithQuery,

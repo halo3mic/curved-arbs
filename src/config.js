@@ -28,19 +28,21 @@ function getPrivateKey() {
 }
 
 MAX_IN = 1e5
-MIN_PROFIT = 0.01
+MIN_PROFIT = 0
 RPC_ENDPOINT = process.env.HTTP_ENDPOINT
 WS_ENDPOINT = process.env.WS_ENDPOINT
 PRIVATE_KEY = getPrivateKey()
 NETWORK = 1
-GAS_PRICE_LIMIT = ethers.utils.parseUnits('500', 'gwei')
+GAS_PRICE_LIMIT = ethers.utils.parseUnits('2000', 'gwei')
 BASE_ASSET = 'T0000'
 MAX_HOPS = 3
 GAS_LIMIT = 800000
+TIP_PRCT = 90
 
 ARCHER_BATCHES_URL = 'https://api.archerdao.io/v1/bundle/send'
 ETH_ADDRESS = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE'
 WETH_ADDRESS = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
+TIP_JAR = '0xD545834edAF0d8A00838052487a5Fe1a9939A9e2'
 ABIS = loadAllABIs()
 ROUTERS = {
     UNIISH_PROXY: '0x121835e15703a1a7bab32626d0927D60F90A81D7',
@@ -70,8 +72,14 @@ DODO_HELPER = '0x533dA777aeDCE766CEAe696bf90f8541A4bA80Eb'
 DISPATCHER = '0x5dc60BC57d7846EEB5C046345950c69224C83b6E'
 
 QUERY = true  // Whether to include the query or not
+ARCHER_REQUESTS_LOGS_PATH='./logs/requests.csv'
+ARCHER_FAIL_LOGS_PATH = './logs/responsesFail.csv'
+ARCHER_PASS_LOGS_PATH = './logs/responsesPass.csv'
 
 module.exports = {
+    ARCHER_REQUESTS_LOGS_PATH, 
+    ARCHER_FAIL_LOGS_PATH, 
+    ARCHER_PASS_LOGS_PATH,
     ARCHER_BATCHES_URL,
     GAS_PRICE_LIMIT,
     RPC_ENDPOINT, 
@@ -87,6 +95,8 @@ module.exports = {
     BASE_ASSET,
     GAS_LIMIT,
     MAX_HOPS,
+    TIP_PRCT,
+    TIP_JAR,
     NETWORK,
     ROUTERS,
     MAX_IN,
