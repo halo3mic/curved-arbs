@@ -52,14 +52,14 @@ async function handleUpdate(blockNumber, forward=true) {
         // console.log(path.symbol, 'profit:', profit)
         if (profit > MIN_PROFIT) {
             let gasAmount = estimateGasAmount(path.pools.length)
-            // let gasPrice = process.argv.includes('--zero-gas') ? '0' : GAS_PRICE
+            let gasPrice = process.argv.includes('--zero-gas') ? '0' : GAS_PRICE
             // console.log(GAS_PRICE, gasPrice)
-            let gasCost = gasAmount*parseFloat(GAS_PRICE)/1e9
+            let gasCost = gasAmount*parseFloat(gasPrice)/1e9
             let netProfit = profit - gasCost  // TODO: This only holds if input asset is ETH or WETH
-            if (netProfit > MIN_PROFIT || process.argv.includes('--zero-gas')) {
+            if (netProfit > MIN_PROFIT) {
                 // gasPrice = (1e9*profit*0.9/gasAmount).toFixed(0)  // Send 90% of profits to the miner
                 return {
-                    gasPrice: GAS_PRICE, 
+                    gasPrice, 
                     gasAmount,
                     grossProfit: profit, 
                     blockNumber,

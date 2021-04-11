@@ -17,12 +17,13 @@ function decToBigNumber(num, dec) {
     return ethers.utils.parseUnits((num*10**dec).toFixed(0), 'wei')
 }
 
-function makeMinerTip(opp) {
-    // Pay % of the gross profit to TipJar
-    let tipAmount = opp.grossProfit * config.TIP_PRCT / 100
-    console.log('Miner will be tipped', tipAmount, 'eth')
-    let tipJar = new ethers.Contract(config.TIP_JAR, config.ABIS['tipJar'])
-
+async function formTipperTx(opp) {
+    let dispatcherTipper = new ethers.Contract(
+        config.DISPATCHER_TIPPER, 
+        config.ABIS['dispatcherTipper']
+    )
+    let inputAmount = decToBigNumber(opp.swapAmounts[0], 18)
+    return dispatcherTipper.populateTransaction.tip(inputAmount)
 }
 
 async function makeTradeTx(opp) {
@@ -54,6 +55,7 @@ async function makeTradeTx(opp) {
         inputLocs = [...inputLocs, ..._inputLoc]
         calldata += utils.convertTxDataToByteCode(txPayload.tx)
     }
+    calldata += await formTipperTx(opp).then(utils.convertTxDataToByteCode)
     calldata = '0x' + calldata
     return { calldata, ethVal, inputLocs }
 }
@@ -163,8 +165,14 @@ async function executeBatches(opps, blockNumber) {
     let nonce = await SIGNER.getTransactionCount()
     let bundle = []
     for (let opp of opps) {
-        let tradeTx = await makeTradeTx(opp)
-        let queryTx = await makeQueryTx(opp)
+        let tradeTx = await makeTradeTx(opp).catch(e => {
+            console.log('Failed to make trade tx')
+            console.log(e)
+        })
+        let queryTx = await makeQueryTx(opp).catch(e => {
+            console.log('Failed to make query tx')
+            console.log(e)
+        })
         let dispatcherTx = await makeDispatcherTxWithQuery(
             tradeTx, 
             queryTx,

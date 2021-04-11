@@ -127,14 +127,6 @@ class Uniswap {
                 tradeTimeout
             )
             tx.value = args.amountIn
-        } else if (args.tknPath[args.tknPath.length-1]==config.WETH_ADDRESS && !wethEnabled) {
-            var tx = await this.routerContract.populateTransaction.swapExactTokensForETH(
-                args.amountIn,
-                amountOut, 
-                args.tknPath, 
-                args.to, 
-                tradeTimeout
-            )
         } else {
             var tx = await this.routerContract.populateTransaction.swapExactTokensForTokens(
                 args.amountIn,
@@ -408,7 +400,8 @@ class DodoV1 {
         // }
         deadlineOffset = deadlineOffset || 300
         let fromTkn = args.tknPath[0]==config.WETH_ADDRESS && !wethEnabled ? config.ETH_ADDRESS : args.tknPath[0]
-        let toTkn = args.tknPath[1]==config.WETH_ADDRESS && !wethEnabled ? config.ETH_ADDRESS : args.tknPath[1]
+        // let toTkn = args.tknPath[1]==config.WETH_ADDRESS && !wethEnabled ? config.ETH_ADDRESS : args.tknPath[1]
+        let toTkn = args.tknPath[1]==config.WETH_ADDRESS ? config.ETH_ADDRESS : args.tknPath[1]
         let deadline = Math.round((Date.now()/1000) + deadlineOffset)
         let directions = this.getDirections(args.poolPath, args.tknPath[0])
         let amountOut = ethers.utils.parseUnits('1', 'wei')
